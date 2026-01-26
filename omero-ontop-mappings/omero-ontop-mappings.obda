@@ -20,7 +20,7 @@ ome_instance:	https://example.org/site/
 
 [MappingDeclaration] @collection [[
 mappingId	image-id
-target		ome_instance:Image/{id} a core:Image ; dc:identifier {id}^^xsd:integer . 
+target		ome_instance:Image/{id} a core:Image ; dc:identifier {id}^^xsd:integer ;  this:detailed_view ome_instance:webclient/img_detail/{id}/ ; this:json  ome_instance:api/v0/m/images/{id}/ ; this:download_image ome_instance:webgateway/render_image/{id}/ .
 source		select id, group_id from image where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId	dataset-id
