@@ -115,7 +115,7 @@ source		select
 			end,
 			'([^\/,#])$','\1/'
 			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
+			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9._-]', 'ZZ', 'g')
 			) as map_key,
 			_annotation_mapvalue.value as map_value
 			from project as _project
@@ -249,7 +249,7 @@ source		select _well.id as well_id,
 			end,
 			'([^\/,#])$','\1/'
 			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
+			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9._-]', 'ZZ', 'g')
 			) as map_key,
 			_annotation_mapvalue.value as map_value
 			from well as _well
