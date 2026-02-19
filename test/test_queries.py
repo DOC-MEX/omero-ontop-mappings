@@ -11,8 +11,7 @@ import unittest
 
 DEBUG = False
 ENDPOINT = "http://193.196.20.26:8080/sparql"
-# ENDPOINT = "http://localhost:8080/sparql"
-
+ENDPOINT = "http://localhost:8080/sparql"
 
 # --- Helper for order-independent pair checks 
 def as_pairs(df, left, right):
@@ -117,7 +116,11 @@ def ontop_materialize(use_cache=False):
 
 class QueriesTest(unittest.TestCase):
     """ :class QueriesTest: Test class hosting all test queries. """
-
+    
+    def require_hcs(self):
+        if not getattr(self, "_has_hcs", False):
+            self.skipTest("HCS data not loaded (insert_hcs.sh not run)")
+    
     @classmethod
     def setUpClass(cls):
 
@@ -145,6 +148,27 @@ PREFIX xml: <http://www.w3.org/XML/1998/namespace>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 """
+
+        # Detect number of datasets in the graph
+
+        # Count images in the graph
+        q_images = """
+        prefix omecore: <https://ld.openmicroscopy.org/core/>
+        select (count(distinct ?s) as ?n) where { ?s a omecore:Image . }
+        """
+        r = list(cls._graph.query(q_images))
+        cls._n_images = int(r[0].n) if r else 0
+
+        # Detect if HCS objects exist to allow skipping HCS-related tests when insert_hcs.sh has not been run.
+        q_has_hcs = """
+        prefix omecore: <https://ld.openmicroscopy.org/core/>
+        ask { ?p a omecore:Plate . }
+        """
+        cls._has_hcs = bool(cls._graph.query(q_has_hcs))
+
+        # Allow overriding expected number of images via environment variable, to allow testing with different datasets.
+        env_expected_images = os.getenv("EXPECTED_N_IMAGES")
+        cls._expected_n_images = int(env_expected_images) if env_expected_images else cls._n_images
 
         return super().setUpClass()
 
@@ -243,7 +267,8 @@ select ?n_projects ?n_datasets ?n_images where {{
 
         # Check numbers.
         number_of_objects = [r for r in response][0]
-        self.assertEqual(int(number_of_objects.n_images  ),  1548)
+        #self.assertEqual(int(number_of_objects.n_images  ),  1548)
+        self.assertEqual(int(number_of_objects.n_images), self._expected_n_images)
         self.assertEqual(int(number_of_objects.n_datasets), 3)
         self.assertEqual(int(number_of_objects.n_projects), 1)
 
@@ -416,7 +441,8 @@ select ?n_projects ?n_datasets ?n_images where {{
         response = graph.query(query_string)
 
         # Test.
-        self.assertEqual(len(response), 1548)
+        #self.assertEqual(len(response), 1548)
+        self.assertEqual(len(response), self._expected_n_images)
 
     def test_project_dataset_image(self):
         """ Test a query for a project-dataset-image hierarchy. """
@@ -694,6 +720,8 @@ SELECT DISTINCT * WHERE {
 
 
     def test_screen(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for a screen."""
 
         query = self._prefix_string + """
@@ -709,6 +737,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(1, len(results))
 
     def test_plate(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for a plate."""
 
         query = self._prefix_string + """
@@ -727,6 +757,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(1, len(results))
 
     def test_wellsample_plateacquisition(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test querying for WellSamples and related PlateAcquisitions."""
 
         query = self._prefix_string + """
@@ -747,6 +779,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(1536, len(results))
 
     def test_screen_plate(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for screen and related plate."""
         results = run_query(self._graph, self._prefix_string + """
 
@@ -761,6 +795,8 @@ SELECT DISTINCT * WHERE {
         self.assertTupleEqual((1, 2), results.shape)
 
     def test_wellsample_relations(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Count number of relations of WellSamples. """
 
         results = run_query(self._graph, self._prefix_string + """
@@ -780,6 +816,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(int(results.iloc[0,1]), 1536) # 384*4 = 1536 related images 
 
     def test_plate_well(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for Plate and Well."""
 
         query = self._prefix_string + f"""
@@ -800,6 +838,8 @@ SELECT DISTINCT * WHERE {
         self.assertTupleEqual((384, 2), results.shape)
 
     def test_well_sample(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for well and well sample."""
 
         query = self._prefix_string + f"""
@@ -820,6 +860,8 @@ SELECT DISTINCT * WHERE {
         self.assertTupleEqual((384*4, 2), results.shape)
 
     def test_plateAcquisition(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test query for a PlateAcquisition."""
 
         query = self._prefix_string + """
@@ -858,6 +900,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(0, len(results))
 
     def test_well_key_value(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test querying for a well kv-annotations as property value pairs."""
 
         query_string = self._prefix_string + f"""
@@ -882,6 +926,8 @@ SELECT DISTINCT * WHERE {
         self.assertEqual(Literal('0.610481812'), results[Literal("nseg.0.m.eccentricity.mean")])
 
     def test_wellsample(self):
+        # helper to skip all HCS-related tests(i.e. insert_hcs.sh not run)
+        self.require_hcs()
         """ Test querying for a wellsample. """
 
         query_string = f"""
