@@ -27,6 +27,8 @@ jobs:
       # Default: keep CI fast; HCS tests are skipped by pytest.
       # Set to "1" if you want HSC test.
       RUN_HCS_IN_CI: "0"
+      # Path to the generated Ontop properties file 
+      ONTOP_PROPERTIES_FILE: omero-ontop-mappings/omero-test-infra.properties
 
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +42,20 @@ jobs:
           docker --version
           docker compose version || true
 
+      # ---------------------------------------------------------------------
+        # Generate Ontop properties for CI (with envsubst)
+      # ---------------------------------------------------------------------       
+      - name: Generate Ontop properties for CI
+        run: |
+          set -euo pipefail
+
+          envsubst < omero-ontop-mappings/omero-test-infra.properties.template \
+           > "${ONTOP_PROPERTIES_FILE}"
+          
+          echo "Generated CI Ontop properties:"
+          sed \
+           -e 's/^jdbc.password=.*/jdbc.password=***hidden***/' \
+           "${ONTOP_PROPERTIES_FILE}"          
       # ---------------------------------------------------------------------
       # omero-test-infra + port override 
       # ---------------------------------------------------------------------
