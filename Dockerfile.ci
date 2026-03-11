@@ -1,0 +1,15 @@
+FROM python:3.10-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    openjdk-17-jre-headless \
+    curl \
+    git \
+    ca-certificates \
+    bash \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+CMD ["bash"]

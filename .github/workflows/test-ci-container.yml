@@ -1,0 +1,47 @@
+name: Test CI container
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Dockerfile.ci"
+      - ".github/workflows/test-ci-container.yml"
+
+jobs:
+  test_container:
+    runs-on: [self-hosted, Linux, X64, omero]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show runner info
+        run: |
+          set -euo pipefail
+          whoami
+          pwd
+          docker --version
+          docker compose version || true
+
+      - name: Build CI test image
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.ci -t omero-ci-test .
+
+      - name: Check Python in container
+        run: |
+          set -euo pipefail
+          docker run --rm omero-ci-test python --version
+
+      - name: Check Java in container
+        run: |
+          set -euo pipefail
+          docker run --rm omero-ci-test java -version
+
+      - name: Check repo mount in container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            omero-ci-test \
+            bash -lc 'pwd && ls -la && ls -la test && ls -la omero-ontop-mappings'
