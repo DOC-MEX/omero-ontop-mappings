@@ -102,9 +102,25 @@ jobs:
           set -euo pipefail
           cd .omero
 
-          docker compose -p ci-omero exec -T db \
-            psql -U postgres -d postgres -c \
-            "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname='ontop') THEN CREATE ROLE ontop LOGIN PASSWORD '!ontop$'; END IF; END \$\$;"
+          for i in $(seq 1 60); do
+            echo "Trying to create ontop role ($i/60) ..."
+            if docker compose -p ci-omero exec -T db \
+              psql -U postgres -d postgres -c \
+              "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'ontop') THEN CREATE ROLE ontop LOGIN PASSWORD '!ontop$'; END IF; END \$\$;" \
+              >/dev/null 2>&1; then
+              echo "Ontop role is ready."
+
+              echo "Databases right now:"
+              docker compose -p ci-omero exec -T db psql -U postgres -d postgres -c "\l" || true
+              docker compose -p ci-omero exec -T db psql -U postgres -d postgres -c "\du ontop" || true
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Failed to create ontop role."
+          docker compose -p ci-omero logs --no-color --tail=200 db || true
+          exit 1
 
       # ----------------------------------------------------------
       # Wait for OMERO schema
