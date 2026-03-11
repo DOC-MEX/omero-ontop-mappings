@@ -1,0 +1,207 @@
+name: Test CI container -> Ontop materialize
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Dockerfile.ci"
+      - "omero-ontop-mappings/**"
+      - "test/**"
+      - ".github/workflows/test-ci-ontop-materialize.yml"
+
+jobs:
+  test_ontop_materialize:
+    runs-on: [self-hosted, Linux, X64, omero]
+
+    env:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: ontop
+      PGPASSWORD: "!ontop$"
+      OMERO_DB: postgres
+      ONTOP_PROPERTIES_FILE: omero-test-infra.ci.properties
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CI container
+        run: |
+          set -euo pipefail
+          docker build --pull -f Dockerfile.ci -t omero-ci-test .
+
+      - name: Show runner info
+        run: |
+          set -euo pipefail
+          whoami
+          pwd
+          docker --version
+          docker compose version || true
+
+      # ----------------------------------------------------------
+      # Fetch OMERO test infrastructure
+      # ----------------------------------------------------------
+      - name: Checkout omero-test-infra
+        run: |
+          set -euo pipefail
+          rm -rf .omero
+          git clone --depth 1 https://github.com/ome/omero-test-infra .omero
+
+      # ----------------------------------------------------------
+      # Mount repo into OMERO container
+      # ----------------------------------------------------------
+      - name: Create compose override
+        run: |
+          set -euo pipefail
+
+          cat > .omero/docker-compose.override.yml <<'YAML'
+          services:
+            omero:
+              volumes:
+                - ..:/repo:ro
+          YAML
+
+          echo "Override file:"
+          cat .omero/docker-compose.override.yml
+
+      # ----------------------------------------------------------
+      # Start OMERO stack
+      # ----------------------------------------------------------
+      - name: Start OMERO stack
+        run: |
+          set -euo pipefail
+          cd .omero
+          docker compose -p ci-omero up -d
+
+      # ----------------------------------------------------------
+      # Wait for Postgres
+      # ----------------------------------------------------------
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          cd .omero
+
+          for i in $(seq 1 120); do
+            if docker compose -p ci-omero exec -T db pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+              echo "Postgres ready"
+              exit 0
+            fi
+            echo "Waiting for Postgres ($i/120)"
+            sleep 2
+          done
+
+          echo "Postgres did not start"
+          docker compose -p ci-omero logs db
+          exit 1
+
+      # ----------------------------------------------------------
+      # Create ontop DB role
+      # ----------------------------------------------------------
+      - name: Create ontop role
+        run: |
+          set -euo pipefail
+          cd .omero
+
+          docker compose -p ci-omero exec -T db \
+            psql -U postgres -d postgres -c \
+            "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname='ontop') THEN CREATE ROLE ontop LOGIN PASSWORD '!ontop$'; END IF; END \$\$;"
+
+      # ----------------------------------------------------------
+      # Wait for OMERO schema
+      # ----------------------------------------------------------
+      - name: Wait for OMERO schema
+        run: |
+          set -euo pipefail
+          cd .omero
+
+          for i in $(seq 1 300); do
+            if docker compose -p ci-omero exec -T db \
+              psql -U postgres -d postgres -tAc "SELECT to_regclass('public.dbpatch');" \
+              | grep -q dbpatch; then
+              echo "OMERO schema ready"
+              exit 0
+            fi
+
+            echo "Waiting for OMERO schema ($i/300)"
+            sleep 5
+          done
+
+          echo "OMERO schema not detected"
+          docker compose -p ci-omero logs omero
+          exit 1
+
+      # ----------------------------------------------------------
+      # Grant DB access for Ontop
+      # ----------------------------------------------------------
+      - name: Grant DB permissions
+        run: |
+          set -euo pipefail
+          cd .omero
+
+          docker compose -p ci-omero exec -T db \
+            psql -U postgres -d postgres -c \
+            "GRANT CONNECT ON DATABASE postgres TO ontop;"
+
+          docker compose -p ci-omero exec -T db \
+            psql -U postgres -d postgres -c \
+            "GRANT USAGE ON SCHEMA public TO ontop;"
+
+          docker compose -p ci-omero exec -T db \
+            psql -U postgres -d postgres -c \
+            "GRANT SELECT ON ALL TABLES IN SCHEMA public TO ontop;"
+
+      # ----------------------------------------------------------
+      # Generate CI Ontop properties
+      # ----------------------------------------------------------
+      - name: Generate Ontop properties
+        run: |
+          set -euo pipefail
+
+          envsubst < omero-ontop-mappings/omero-test-infra.properties.template \
+            > omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}
+
+          echo "Generated properties:"
+          sed 's/^jdbc.password=.*/jdbc.password=***hidden***/' \
+            omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}
+
+      # ----------------------------------------------------------
+      # Run Ontop materialization inside CI container
+      # ----------------------------------------------------------
+      - name: Run Ontop materialization in container
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            --network ci-omero_default \
+            -e ONTOP_PROPERTIES_FILE=${ONTOP_PROPERTIES_FILE} \
+            -v "${PWD}:/workspace" \
+            -w /workspace/omero-ontop-mappings \
+            omero-ci-test \
+            bash -lc '
+              ../ontop-cli/ontop materialize \
+                --mapping=omero-ontop-mappings.obda \
+                --ontology=omero-ontop-mappings.ttl \
+                --properties=${ONTOP_PROPERTIES_FILE} \
+                --output /workspace/test/omero-test-infra
+            '
+
+      # ----------------------------------------------------------
+      # Verify RDF output
+      # ----------------------------------------------------------
+      - name: Verify RDF file
+        run: |
+          set -euo pipefail
+          ls -lh test/omero-test-infra.rdf
+          test -s test/omero-test-infra.rdf
+
+      # ----------------------------------------------------------
+      # Cleanup
+      # ----------------------------------------------------------
+      - name: Cleanup
+        if: always()
+        run: |
+          set -euo pipefail
+          cd .omero
+          docker compose -p ci-omero down -v || true
