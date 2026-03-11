@@ -52,4 +52,13 @@ jobs:
             -v "${PWD}:/workspace" \
             -w /workspace \
             omero-ci-test \
-            python -c "import rdflib, pandas, requests, test.test_queries; print('Python test imports OK')"       
+            python -c "import rdflib, pandas, requests, test.test_queries; print('Python test imports OK')" 
+      
+      - name: Collect pytest tests inside container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            omero-ci-test \
+            python -m pytest --collect-only test/test_queries.py      
