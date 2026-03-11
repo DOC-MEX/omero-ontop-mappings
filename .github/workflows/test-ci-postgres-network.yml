@@ -1,0 +1,82 @@
+name: Test CI container -> Postgres network
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Dockerfile.ci"
+      - ".github/workflows/test-ci-postgres-network.yml"
+
+jobs:
+  test_postgres_network:
+    runs-on: [self-hosted, Linux, X64, omero]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show runner info
+        run: |
+          set -euo pipefail
+          whoami
+          pwd
+          docker --version
+
+      - name: Create isolated Docker network
+        run: |
+          set -euo pipefail
+          docker network create ci-net
+
+      - name: Start Postgres test container
+        run: |
+          set -euo pipefail
+          docker run -d --rm \
+            --name ci-postgres \
+            --network ci-net \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_DB=postgres \
+            postgres:16
+
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if docker exec ci-postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+              echo "Postgres is ready."
+              exit 0
+            fi
+            echo "Waiting for Postgres ($i/60)..."
+            sleep 2
+          done
+          echo "Postgres did not become ready."
+          docker logs ci-postgres || true
+          exit 1
+
+      - name: Check Postgres connectivity from CI container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network ci-net \
+            -e PGPASSWORD=postgres \
+            omero-ci-test \
+            bash -lc 'python --version && python -c "import socket; print(socket.gethostbyname(\"ci-postgres\"))"'
+
+      - name: Install psql client in CI container and test DB connection
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network ci-net \
+            -e PGPASSWORD=postgres \
+            omero-ci-test \
+            bash -lc "
+              apt-get update >/dev/null &&
+              apt-get install -y postgresql-client >/dev/null &&
+              psql -h ci-postgres -U postgres -d postgres -c '\l'
+            "
+
+      - name: Cleanup
+        if: always()
+        run: |
+          set -euo pipefail
+          docker rm -f ci-postgres || true
+          docker network rm ci-net || true

@@ -9,7 +9,7 @@ on:
 
 jobs:
   test_container:
-    runs-on: [self-hosted, Linux, X64, omero]
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - uses: actions/checkout@v4
