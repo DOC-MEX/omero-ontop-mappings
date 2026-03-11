@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build CI test image
+        run: |
+          set -euo pipefail
+          docker build --pull -f Dockerfile.ci -t omero-ci-test .
+
       - name: Show runner info
         run: |
           set -euo pipefail
