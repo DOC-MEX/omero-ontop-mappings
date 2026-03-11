@@ -45,3 +45,11 @@ jobs:
             -w /workspace \
             omero-ci-test \
             bash -lc 'pwd && ls -la && ls -la test && ls -la omero-ontop-mappings'
+      - name: Check Python test imports in container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            omero-ci-test \
+            python -c "import rdflib, pandas, requests, test.test_queries; print('Python test imports OK')"       
