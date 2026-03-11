@@ -24,7 +24,7 @@ jobs:
       - name: Create isolated Docker network
         run: |
           set -euo pipefail
-          docker network create ci-net
+          docker network create ci-net || true
 
       - name: Start Postgres test container
         run: |
@@ -56,6 +56,8 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e PYTHONDONTWRITEBYTECODE=1 \
             --network ci-net \
             -e PGPASSWORD=postgres \
             omero-ci-test \
@@ -65,6 +67,8 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e PYTHONDONTWRITEBYTECODE=1 \
             --network ci-net \
             -e PGPASSWORD=postgres \
             omero-ci-test \
