@@ -63,7 +63,7 @@ jobs:
             omero-ci-test \
             bash -lc 'python --version && python -c "import socket; print(socket.gethostbyname(\"ci-postgres\"))"'
 
-      - name: Install psql client in CI container and test DB connection
+      - name: Test DB connection with psql from CI container
         run: |
           set -euo pipefail
           docker run --rm \
@@ -72,11 +72,7 @@ jobs:
             --network ci-net \
             -e PGPASSWORD=postgres \
             omero-ci-test \
-            bash -lc "
-              apt-get update >/dev/null &&
-              apt-get install -y postgresql-client >/dev/null &&
-              psql -h ci-postgres -U postgres -d postgres -c '\l'
-            "
+            psql -h ci-postgres -U postgres -d postgres -c '\l'
 
       - name: Cleanup
         if: always()
