@@ -29,9 +29,10 @@ RUN python -m pip install --upgrade pip setuptools wheel \
 RUN wget -q https://github.com/ontop/ontop/releases/download/ontop-5.4.0/ontop-cli-5.4.0.zip \
  && mkdir -p /tmp/ontop-extract /opt/ontop-cli \
  && unzip -q ontop-cli-5.4.0.zip -d /tmp/ontop-extract \
- && extracted_dir="$(find /tmp/ontop-extract -mindepth 1 -maxdepth 1 -type d | head -n 1)" \
- && test -n "$extracted_dir" \
- && cp -a "$extracted_dir"/. /opt/ontop-cli/ \
+ && ontop_bin="$(find /tmp/ontop-extract -type f -name ontop | head -n 1)" \
+ && test -n "$ontop_bin" \
+ && ontop_dir="$(dirname "$ontop_bin")" \
+ && cp -a "$ontop_dir"/. /opt/ontop-cli/ \
  && mkdir -p /opt/ontop-cli/jdbc \
  && wget -q -O /opt/ontop-cli/jdbc/postgresql-42.7.4.jar \
     https://jdbc.postgresql.org/download/postgresql-42.7.4.jar \
