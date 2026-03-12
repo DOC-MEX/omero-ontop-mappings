@@ -15,8 +15,8 @@ jobs:
       OMERO_PASS: omero
 
       # Postgres service exposed by docker-compose.override.yml
-      PGHOST: 127.0.0.1
-      PGPORT: "15432"
+      PGHOST: db
+      PGPORT: "5432"
 
       OMERO_DB: postgres
       
@@ -27,11 +27,20 @@ jobs:
       # Default: keep CI fast; HCS tests are skipped by pytest.
       # Set to "1" if you want HSC test.
       RUN_HCS_IN_CI: "0"
-      # Path to the generated Ontop properties file 
+
+      # Path to the generated Ontop properties file
       ONTOP_PROPERTIES_FILE: omero-test-infra.ci.properties
+
+      # Predictable compose network name for docker run --network
+      COMPOSE_PROJECT_NAME: ci-omero
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build CI container
+        run: |
+          set -euo pipefail
+          docker build --pull -f Dockerfile.ci -t omero-ci-test .
 
       - name: Show runner info
         run: |
@@ -43,19 +52,20 @@ jobs:
           docker compose version || true
 
       # ---------------------------------------------------------------------
-        # Generate Ontop properties for CI (with envsubst)
-      # ---------------------------------------------------------------------       
+      # Generate Ontop properties for CI (with envsubst)
+      # ---------------------------------------------------------------------
       - name: Generate Ontop properties for CI
         run: |
           set -euo pipefail
 
           envsubst < omero-ontop-mappings/omero-test-infra.properties.template \
-           > "omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}"
+            > "omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}"
           
           echo "Generated CI Ontop properties:"
           sed \
-           -e 's/^jdbc.password=.*/jdbc.password=***hidden***/' \
-           "omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}"          
+            -e 's/^jdbc.password=.*/jdbc.password=***hidden***/' \
+            "omero-ontop-mappings/${ONTOP_PROPERTIES_FILE}"
+
       # ---------------------------------------------------------------------
       # omero-test-infra + port override 
       # ---------------------------------------------------------------------
@@ -188,31 +198,8 @@ jobs:
             "SELECT COUNT(*) FROM public.dbpatch;" || true
 
       # ---------------------------------------------------------------------
-      # Python: 3.10 + prebuilt Ice wheel 
-      # ---------------------------------------------------------------------
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Python deps + OMERO CLI (prebuilt zeroc-ice wheel)
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install \
-            https://github.com/glencoesoftware/zeroc-ice-py-linux-x86_64/releases/download/20240202/zeroc_ice-3.6.5-cp310-cp310-manylinux_2_28_x86_64.whl
-          python -m pip install "omero-py==5.21.2" pytest rdflib pandas requests
-
-          which omero
-          omero version
-
-      # ---------------------------------------------------------------------
       # Verify repo mount inside OMERO container
       # ---------------------------------------------------------------------
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
       - name: Verify repo mount inside OMERO container
         run: |
           set -euo pipefail
@@ -286,19 +273,36 @@ jobs:
       - name: Install ontop-cli
         run: |
           set -euo pipefail
-          chmod +x utils/install_ontop.sh
-          utils/install_ontop.sh
 
-      - name: Debug confirm Postgres port open on runner
-        run: |
-          set -euo pipefail
-          echo "Checking Postgres ${PGHOST}:${PGPORT} ..."
-          (echo >/dev/tcp/${PGHOST}/${PGPORT}) >/dev/null 2>&1 && echo "PG port open" || (echo "PG port NOT open" && exit 1)
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            --network "${COMPOSE_PROJECT_NAME}_default" \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            omero-ci-test \
+            bash -lc '
+              chmod +x utils/install_ontop.sh
+              utils/install_ontop.sh
+            '
 
       - name: Run pytest
         run: |
           set -euo pipefail
-          pytest -q
+
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            -e GITHUB_ACTIONS=true \
+            -e RUN_HCS_IN_CI="${RUN_HCS_IN_CI}" \
+            -e ONTOP_PROPERTIES_FILE="${ONTOP_PROPERTIES_FILE}" \
+            --network "${COMPOSE_PROJECT_NAME}_default" \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            omero-ci-test \
+            bash -lc '
+              python -m pytest -q
+            '
 
       # ---------------------------------------------------------------------
       # Teardown always
@@ -314,4 +318,3 @@ jobs:
             docker compose logs --no-color --tail=200 db || true
             docker compose down -v || true
           fi
-
