@@ -280,9 +280,11 @@ jobs:
             -w /workspace \
             omero-ci-test \
             bash -lc '
-              ls -la ontop-cli
-              ls -la ontop-cli/jdbc
-            '   
+              rm -f /workspace/ontop-cli
+              ln -s /opt/ontop-cli /workspace/ontop-cli
+              ls -la /workspace/ontop-cli
+              ls -la /workspace/ontop-cli/jdbc
+            '
       # ---------------------------------------------------------------------
       # Run pytest in the CI container
       # ---------------------------------------------------------------------    
@@ -302,9 +304,10 @@ jobs:
             -w /workspace \
             omero-ci-test \
             bash -lc '
+              rm -f /workspace/ontop-cli
+              ln -s /opt/ontop-cli /workspace/ontop-cli
               python -m pytest -q
             '
-
       # ---------------------------------------------------------------------
       # Teardown always
       # ---------------------------------------------------------------------
