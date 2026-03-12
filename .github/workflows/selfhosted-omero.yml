@@ -265,12 +265,10 @@ jobs:
             # Optional: quick sanity output
             "$OMERO" hql "select count(l.id) from WellAnnotationLink l where l.parent.id=205" || true
           '
-     
-    
-      # ---------------------------------------------------------------------
-      # Ontop + pytest
-      # ---------------------------------------------------------------------
-      - name: Install ontop-cli
+     # ---------------------------------------------------------------------
+     # Check Ontop CLI and JDBC dir in the CI container. Temporary sanity check for repo mount
+
+      - name: Check Ontop in CI container
         run: |
           set -euo pipefail
 
@@ -282,9 +280,12 @@ jobs:
             -w /workspace \
             omero-ci-test \
             bash -lc '
-              chmod +x utils/install_ontop.sh
-              utils/install_ontop.sh
-            '
+              ls -la ontop-cli
+              ls -la ontop-cli/jdbc
+            '   
+      # ---------------------------------------------------------------------
+      # Run pytest in the CI container
+      # ---------------------------------------------------------------------    
 
       - name: Run pytest
         run: |
