@@ -26,12 +26,12 @@ jobs:
 
       # Default: keep CI fast; HCS tests are skipped by pytest.
       # Set to "1" if you want HSC test.
-      RUN_HCS_IN_CI: "0"
+      RUN_HCS_IN_CI: "1"
 
       # Path to the generated Ontop properties file
       ONTOP_PROPERTIES_FILE: omero-test-infra.ci.properties
 
-      # Predictable compose network name for docker run --network
+      # Fixed compose project name to ensure access test-infra network
       COMPOSE_PROJECT_NAME: ci-omero
 
     steps:
@@ -265,26 +265,6 @@ jobs:
             # Optional: quick sanity output
             "$OMERO" hql "select count(l.id) from WellAnnotationLink l where l.parent.id=205" || true
           '
-     # ---------------------------------------------------------------------
-     # Check Ontop CLI and JDBC dir in the CI container. Temporary sanity check for repo mount
-
-      - name: Check Ontop in CI container
-        run: |
-          set -euo pipefail
-
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            --network "${COMPOSE_PROJECT_NAME}_default" \
-            -v "${PWD}:/workspace" \
-            -w /workspace \
-            omero-ci-test \
-            bash -lc '
-              rm -f /workspace/ontop-cli
-              ln -s /opt/ontop-cli /workspace/ontop-cli
-              ls -la /workspace/ontop-cli
-              ls -la /workspace/ontop-cli/jdbc
-            '
       # ---------------------------------------------------------------------
       # Run pytest in the CI container
       # ---------------------------------------------------------------------    
