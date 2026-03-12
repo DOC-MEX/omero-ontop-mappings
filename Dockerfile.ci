@@ -27,13 +27,13 @@ RUN python -m pip install --upgrade pip setuptools wheel \
 
 # Install Ontop CLI outside /workspace so it is not hidden by bind mounts
 RUN wget -q https://github.com/ontop/ontop/releases/download/ontop-5.4.0/ontop-cli-5.4.0.zip \
- && mkdir -p /opt/ontop-cli \
- && unzip -q ontop-cli-5.4.0.zip -d /opt/ontop-cli \
- && mv /opt/ontop-cli/ontop-cli-5.4.0/* /opt/ontop-cli/ \
- && rmdir /opt/ontop-cli/ontop-cli-5.4.0 \
+ && mkdir -p /tmp/ontop-extract /opt/ontop-cli \
+ && unzip -q ontop-cli-5.4.0.zip -d /tmp/ontop-extract \
+ && extracted_dir="$(find /tmp/ontop-extract -mindepth 1 -maxdepth 1 -type d | head -n 1)" \
+ && test -n "$extracted_dir" \
+ && cp -a "$extracted_dir"/. /opt/ontop-cli/ \
  && mkdir -p /opt/ontop-cli/jdbc \
  && wget -q -O /opt/ontop-cli/jdbc/postgresql-42.7.4.jar \
     https://jdbc.postgresql.org/download/postgresql-42.7.4.jar \
- && rm -f ontop-cli-5.4.0.zip
-
+ && rm -rf /tmp/ontop-extract ontop-cli-5.4.0.zip
 CMD ["bash"]
