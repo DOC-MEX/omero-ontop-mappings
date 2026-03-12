@@ -306,6 +306,12 @@ jobs:
             bash -lc '
               rm -f /workspace/ontop-cli
               ln -s /opt/ontop-cli /workspace/ontop-cli
+
+              echo "PWD=$(pwd)"
+              ls -la /workspace/ontop-cli || true
+              ls -la /workspace/ontop-cli/jdbc || true
+              ls -la /workspace/ontop-cli/ontop || true
+
               python -m pytest -q
             '
       # ---------------------------------------------------------------------
