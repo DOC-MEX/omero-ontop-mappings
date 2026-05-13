@@ -21,7 +21,7 @@ LOG_FILE="index_output/${INSTANCE_NAME}.server-log.txt"
 
 # --- Commands -----------------------------------------------------------------
 start_server() {
-  echo "🚀 Starting QLever server for $INSTANCE_NAME..."
+  echo " Starting QLever server for $INSTANCE_NAME..."
 
   # Ensure index directory exists
   if [ ! -d "$INDEX_DIR" ]; then
@@ -56,7 +56,7 @@ start_server() {
         -c 1G \
         -e 16G \
         -k 200 \
-        -s 30s \
+        -s 120s \
         -a ${TOKEN} \
         > ${INSTANCE_NAME}.server-log.txt 2>&1
     "
