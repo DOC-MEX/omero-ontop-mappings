@@ -691,7 +691,6 @@ SELECT distinct ?prop WHERE {
             URIRef("https://ld.openmicroscopy.org/omekg#tag_annotation_value"),
             URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
             URIRef("https://ld.openmicroscopy.org/core/hasAnnotation"),
-            URIRef("https://ld.openmicroscopy.org/omekg#acquisition_date"),
         ]
 
         found_properties = [u for u in response_df.prop.unique()]
