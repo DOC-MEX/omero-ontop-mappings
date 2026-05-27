@@ -85,7 +85,7 @@ source		select id, name, description, owner_id, group_id from plateacquisition w
 
 mappingId	roi-attributes
 target		ome_instance:ROI/{id} rdfs:label {name}^^xsd:string ; rdfs:comment {description}^^xsd:string ; core:experimenter ome_instance:Experimenter/{owner_id} ; core:experimenter_group ome_instance:ExperimenterGroup/{group_id} . 
-source		select id, name, description, owner_id, group_id from image where group_id in (select parent as group_id from groupexperimentermap where child=0)
+source		select id, name, description, owner_id, group_id from roi where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId	channel-attributes
 target		ome_instance:Channel/{id} core:experimenter ome_instance:Experimenter/{owner_id} ; core:experimenter_group ome_instance:ExperimenterGroup/{group_id} . 
@@ -271,6 +271,14 @@ source		select parent as screen_id, child from screenannotationlink
 mappingId	well-mapannotation
 target		ome_instance:Well/{well_id} core:hasAnnotation ome_instance:MapAnnotation/{child} . 
 source		select parent as well_id, child from wellannotationlink
+
+mappingId	reagent-mapannotation
+target		ome_instance:Reagent/{reagent_id} core:hasAnnotation ome_instance:MapAnnotation/{child} .
+source		select parent as reagent_id, child from reagentannotationlink
+
+mappingId	plateacquisition-mapannotation
+target		ome_instance:PlateAcquisition/{plateacquisition_id} core:hasAnnotation ome_instance:MapAnnotation/{child} .
+source		select parent as plateacquisition_id, child from plateacquisitionannotationlink
 
 mappingId	MAPID-dataset_tag
 target		ome_instance:Dataset/{dataset_id} this:tag_annotation_value {tag_text}^^xsd:string .
