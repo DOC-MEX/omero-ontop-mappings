@@ -85,7 +85,7 @@ source		select id, name, description, owner_id, group_id from plateacquisition w
 
 mappingId	roi-attributes
 target		ome_instance:ROI/{id} rdfs:label {name}^^xsd:string ; rdfs:comment {description}^^xsd:string ; core:experimenter ome_instance:Experimenter/{owner_id} ; core:experimenter_group ome_instance:ExperimenterGroup/{group_id} . 
-source		select id, name, description, owner_id, group_id from image where group_id in (select parent as group_id from groupexperimentermap where child=0)
+source		select id, name, description, owner_id, group_id from roi where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId	channel-attributes
 target		ome_instance:Channel/{id} core:experimenter ome_instance:Experimenter/{owner_id} ; core:experimenter_group ome_instance:ExperimenterGroup/{group_id} . 
@@ -98,84 +98,12 @@ source		select
 			child as dataset_id
 			from projectdatasetlink
 
-mappingId	MAPID-project-kv-annotations
-target		ome_instance:Project/{project_id} <{map_key}> {map_value}^^xsd:string . 
-source		select
-			_project.id as project_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from project as _project
-			join projectannotationlink as _projectannotationlink on _projectannotationlink.parent = _project.id
-			join annotation as _annotation on _projectannotationlink.child = _annotation.id
-			join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
-mappingId	MAPID-dataset-kv-annotations
-target		ome_instance:Dataset/{dataset_id} <{map_key}> {map_value}^^xsd:string . 
-source		select
-			_dataset.id as dataset_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from dataset as _dataset
-			join datasetannotationlink as _datasetannotationlink on _datasetannotationlink.parent = _dataset.id
-			join annotation as _annotation on _datasetannotationlink.child = _annotation.id
-			join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
 mappingId	MAPID-Image-acquisitiondate
 target		ome_instance:Image/{image_id} this:acquisition_date {image_acquisitiondate}^^xsd:dateTime . 
 source		select
 			_image.id as image_id,
 			_image.acquisitiondate as image_acquisitiondate
 			from image as _image
-
-mappingId	MAPID-Image-kv-annotations
-target		ome_instance:Image/{image_id} <{map_key}> {map_value}^^xsd:string . 
-source		select
-			_image.id as image_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from image as _image
-			join imageannotationlink as _imageannotationlink on _imageannotationlink.parent = _image.id
-			join annotation as _annotation on _imageannotationlink.child = _annotation.id
-			join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
 
 mappingId	MAPID-experimentergroup
 target		ome_instance:ExperimenterGroup/{experimentergroup_id} a core:ExperimenterGroup ; dc:identifier {experimentergroup_id}^^xsd:integer ; rdfs:label {name}^^xsd:string . 
@@ -212,29 +140,6 @@ mappingId	MAPID-well_properties
 target		ome_instance:Well/{well_id} core:reagent ome_instance:Reagent/{reagent_id} . 
 source		select parent as well_id, child as reagent_id from wellreagentlink
 
-mappingId	MAPID-well-kvannotations
-target		ome_instance:Well/{well_id} <{map_key}> {map_value}^^xsd:string . 
-source		select _well.id as well_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from well as _well
-			left join wellannotationlink as _wellannotationlink on _wellannotationlink.parent = _well.id
-			left join annotation as _annotation on _wellannotationlink.child = _annotation.id
-			left join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
 mappingId	MAPID-wellsample-id
 target		ome_instance:WellSample/{id} a core:WellSample ; dc:identifier {id}^^xsd:integer ; core:experimenter ome_instance:Experimenter/{owner_id} ; core:experimenter_group ome_instance:ExperimenterGroup/{group_id} ; core:well_index {well_index}^^xsd:integer . 
 source		select id, well_index, owner_id, group_id from wellsample
@@ -259,104 +164,13 @@ mappingId	MAPID-plate-well
 target		ome_instance:Plate/{plate_id} dcterms:hasPart ome_instance:Well/{well_id} . 
 source		select plate as plate_id, id as well_id from well where well.group_id in (select parent as group_id from groupexperimentermap where child=0)
 
-mappingId	MAPID-plate-kvannotations
-target		ome_instance:Plate/{plate_id} <{map_key}> {map_value}^^xsd:string . 
-source		select _plate.id as plate_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from plate as _plate
-			left join plateannotationlink as _plateannotationlink on _plateannotationlink.parent = _plate.id
-			left join annotation as _annotation on _plateannotationlink.child = _annotation.id
-			left join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
 mappingId	MAPID-281f9aebe6744a7194389d0fcc967624
 target		ome_instance:Screen/{screen_id} dcterms:relation ome_instance:Plate/{plate_id} . 
 source		select _screen.id as screen_id, _screenplatelink.child as plate_id from screen as _screen left join screenplatelink as _screenplatelink on _screen.id = _screenplatelink.parent
 
-mappingId	MAPID-screen-kvannotations
-target		ome_instance:Screen/{screen_id} <{map_key}> {map_value}^^xsd:string . 
-source		select _screen.id as screen_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from screen as _screen
-			left join screenannotationlink as _screenannotationlink on _screenannotationlink.parent = _screen.id
-			left join annotation as _annotation on _screenannotationlink.child = _annotation.id
-			left join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
 mappingId	MAPID-281f9aebe6744a7194389d0fcc967625
 target		ome_instance:Reagent/{reagent_id} a core:Reagent ; dc:identifier {reagent_id}^^xsd:integer . 
 source		select child as reagent_id, parent as well_id from wellreagentlink
-
-mappingId	MAPID-reagent-kvannotations
-target		ome_instance:Reagent/{reagent_id} <{map_key}> {map_value}^^xsd:string . 
-source		select _reagent.id as reagent_id,
-			concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from reagent as _reagent
-			left join reagentannotationlink as _reagentannotationlink on _reagentannotationlink.parent = _reagent.id
-			left join annotation as _annotation on _reagentannotationlink.child = _annotation.id
-			left join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
-
-mappingId	MAPID-PlateAcquisition-kvannotations
-target		ome_instance:PlateAcquisition/{plateacquisition_id} <{map_key}> {map_value}^^xsd:string . 
-source		select _plateacquisition.id as plateacquisition_id, concat(
-			regexp_replace(
-			case
-			when _annotation.ns is null then 'http://www.openmicroscopy.org/ns/default/'
-			else
-			case
-			when _annotation.ns ~ '^http[s]{0,1}:\/\/' then _annotation.ns
-			else 'http://www.openmicroscopy.org/ns/default/'
-			end
-			end,
-			'([^\/,#])$','\1/'
-			),
-			regexp_replace(_annotation_mapvalue.name,'[^a-zA-Z0-9./_-]', 'ZZ', 'g')
-			) as map_key,
-			_annotation_mapvalue.value as map_value
-			from plateacquisition as _plateacquisition
-			left join plateacquisitionannotationlink as _plateacquisitionannotationlink on _plateacquisitionannotationlink.parent = _plateacquisition.id
-			left join annotation as _annotation on _plateacquisitionannotationlink.child = _annotation.id
-			left join annotation_mapvalue as _annotation_mapvalue on _annotation.id = _annotation_mapvalue.annotation_id
 
 mappingId	MAPID-plate-tag
 target		ome_instance:Plate/{plate_id} this:tag_annotation_value {tag_text}^^xsd:string . 
@@ -457,6 +271,14 @@ source		select parent as screen_id, child from screenannotationlink
 mappingId	well-mapannotation
 target		ome_instance:Well/{well_id} core:hasAnnotation ome_instance:MapAnnotation/{child} . 
 source		select parent as well_id, child from wellannotationlink
+
+mappingId	reagent-mapannotation
+target		ome_instance:Reagent/{reagent_id} core:hasAnnotation ome_instance:MapAnnotation/{child} .
+source		select parent as reagent_id, child from reagentannotationlink
+
+mappingId	plateacquisition-mapannotation
+target		ome_instance:PlateAcquisition/{plateacquisition_id} core:hasAnnotation ome_instance:MapAnnotation/{child} .
+source		select parent as plateacquisition_id, child from plateacquisitionannotationlink
 
 mappingId	MAPID-dataset_tag
 target		ome_instance:Dataset/{dataset_id} this:tag_annotation_value {tag_text}^^xsd:string .
