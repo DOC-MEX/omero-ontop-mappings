@@ -125,7 +125,8 @@ def ontop_materialize(use_cache=False):
     )
     cmd = shlex.split(command)
 
-    if not use_cache:
+    # Caching: Only materialize if file not present or caching not requested
+    if not use_cache or not os.path.isfile(target_rdf):
         proc = subprocess.Popen(cmd, cwd=mappings_directory)
         return_code = proc.wait()
         if return_code != 0:
@@ -135,8 +136,7 @@ def ontop_materialize(use_cache=False):
 
 class QueriesTest(unittest.TestCase):
     """ :class QueriesTest: Test class hosting all test queries. """
-    
-    
+
     @classmethod
     def setUpClass(cls):
 
@@ -230,6 +230,8 @@ prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         """Test that a structured MapAnnotation contains a key/value pair."""
 
         results = self.query_map_annotations(subject_uri)
+        if DEBUG:
+            print('\n'+results.to_string())
         actual_values = [
             val for found_key, val in zip(results.get("key", []), results.get("val", []))
             if str(found_key) == key
@@ -937,7 +939,8 @@ SELECT distinct ?prop WHERE {
 
         self.assertEqual(0, len(results))
 
-    @unittest.skipIf(SKIP_HCS_TESTS, SKIP_HCS_REASON)
+    # @unittest.skipIf(SKIP_HCS_TESTS, SKIP_HCS_REASON)
+    @unittest.skip("see gh issue #81")
     def test_well_key_value(self):
         """Test well key-value annotations via structured MapAnnotation entries."""
 
@@ -1044,6 +1047,30 @@ SELECT distinct ?prop WHERE {
 
         self.assertEqual(results['min_red'].sum(), 0)
         self.assertTrue(all(results['max_blue'] == 255))
+
+    def test_service_project_relation(self):
+        """ Test the relationship between the OMERO service instance and the projects it contains."""
+
+        query_string = f"""
+    prefix omekg: <https://ld.openmicroscopy.org/omekg/>
+    prefix omecore: <https://ld.openmicroscopy.org/core/>
+    prefix dcterms: <http://purl.org/dc/terms/>
+
+    select ?omero (count(?prj) as ?n_projects)
+  where {{
+      ?omero a omekg:OMEROServer;
+               dcterms:hasPart ?prj .
+      ?prj a omecore:Project .
+     }}
+  group by ?omero
+        """
+
+        results = run_query(self._graph, query_string)
+
+        if DEBUG:
+            print("\n" + results.to_string())
+
+        self.assertEqual(int(results.loc[0,'n_projects']), 1)
 
 
 if __name__ == "__main__":

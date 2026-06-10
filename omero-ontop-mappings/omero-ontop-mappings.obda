@@ -298,6 +298,10 @@ source		select
 			join imageannotationlink on imageannotationlink.parent = image.id
 			join annotation on imageannotationlink.child = annotation.id where annotation.textvalue is not NULL
 
+mappingId MAPID-omero-project
+target    <https://example.org/site> a omekg:OMEROServer;
+                        dcterms:hasPart ome_instance:Project/{id} .
+source    select id from project where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 ]]
 
