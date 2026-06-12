@@ -16,6 +16,8 @@ omekg:		https://ld.openmicroscopy.org/omekg/
 vcard:		http://www.w3.org/2006/vcard/ns#
 linkml:		https://w3id.org/linkml/
 dcterms:		http://purl.org/dc/terms/
+geo:            http://www.opengis.net/ont/geosparql#
+geof:           http://www.opengis.net/def/function/geosparql/
 ome_instance:	https://example.org/site/
 
 [MappingDeclaration] @collection [[
@@ -298,10 +300,23 @@ source		select
 			join imageannotationlink on imageannotationlink.parent = image.id
 			join annotation on imageannotationlink.child = annotation.id where annotation.textvalue is not NULL
 
-mappingId MAPID-omero-project
-target    <https://example.org/site> a omekg:OMEROServer;
-                        dcterms:hasPart ome_instance:Project/{id} .
-source    select id from project where group_id in (select parent as group_id from groupexperimentermap where child=0)
+mappingId	MAPID-omero-project
+target		<https://example.org/site/> a omekg:OMEROServer . <https://example.org/site/> dcterms:hasPart ome_instance:Project/{id} .
+source		select id from project where group_id in (select parent as group_id from groupexperimentermap where child=0)
+
+mappingId       MAPID-image-geosparql-point
+target          ome_instance:Image/{image_id} geo:hasGeometry ome_instance:Image/{image_id}/geometry . ome_instance:Image/{image_id}/geometry a geo:Geometry ; geo:asWKT {wkt}^^geo:wktLiteral .
+source          select
+                        ial.parent as image_id,
+                        concat('POINT(', lon.value, ' ', lat.value, ')') as wkt
+                        from annotation_mapvalue lat
+                        join annotation_mapvalue lon
+                          on lat.annotation_id = lon.annotation_id
+                        join imageannotationlink ial
+                          on ial.child = lat.annotation_id
+                        where lat.name = 'latitude'
+                          and lon.name = 'longitude'
+
 
 ]]
 
