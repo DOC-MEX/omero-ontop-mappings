@@ -291,6 +291,10 @@ source		select
 			join datasetannotationlink on datasetannotationlink.parent = dataset.id
 			join annotation on datasetannotationlink.child = annotation.id where annotation.textvalue is not NULL
 
+mappingId MAPID-image_thumbnail
+target ome_instance:Image/{image_id} this:thumbnail ome_instance:webclient/render_thumbnail/{image_id} .
+source select id as image_id from image where group_id in (select parent as group_id from groupexperimentermap where child=0)
+
 mappingId	MAPID-image_tag
 target		ome_instance:Image/{image_id} this:tag_annotation_value {tag_text}^^xsd:string .
 source		select

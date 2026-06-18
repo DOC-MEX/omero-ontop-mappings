@@ -9,8 +9,8 @@ from urllib import parse
 
 import unittest
 
-DEBUG = False
-ENDPOINT = "http://localhost:8080/sparql"
+DEBUG = True
+ENDPOINT = "http://localhost:8081/sparql"
 
 IS_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
 RUN_HCS_IN_CI = os.getenv("RUN_HCS_IN_CI", "0") == "1"
@@ -1071,6 +1071,29 @@ SELECT distinct ?prop WHERE {
             print("\n" + results.to_string())
 
         self.assertEqual(int(results.loc[0,'n_projects']), 1)
+
+    def test_image_thumbnail(self):
+        """ Check querying for the thumbnail of a given image. """
+
+        query_string = f"""
+    prefix omekgprop: <https://ld.openmicroscopy.org/omekg#>
+    prefix omecore: <https://ld.openmicroscopy.org/core/>
+
+    select *
+  where {{
+      ?img a omecore:Image;
+               dc:identifier ?id;
+               omekgprop:thumbnail ?thumb .
+     }}
+        order by ?id
+        """
+
+        results = run_query(self._graph, query_string)
+
+        if DEBUG:
+            print("\n" + results.to_string())
+
+        self.assertEqual(results.loc[0,'thumb'], URIRef('https://example.org/site/webclient/render_thumbnail/1'))
 
 
 if __name__ == "__main__":
