@@ -11,8 +11,8 @@ text = src.read_text()
 # 1) Prefix line: ome_instance: https://example.org/site/
 #    becomes: {{ cookiecutter.prefix }}: {{ cookiecutter.site_uri }}
 text = text.replace(
-    "ome_instance:\thttps://example.org/site/",
-    "{{ cookiecutter.prefix }}:\t{{ cookiecutter.site_uri }}"
+    "ome_instance: https://example.org/site/",
+    "{{ cookiecutter.prefix }}: {{ cookiecutter.site_uri }}"
 )
 
 # 2) All other occurrences of ome_instance
@@ -21,7 +21,21 @@ text = text.replace(
     "{{ cookiecutter.prefix }}:"
 )
 
-# 3) Public condition: child=0  -> child{{ cookiecutter.publiccond }}
+# 3) Prefix line: base: https://example.org/
+#    becomes: base: {{ cookiecutter.site_uri }}
+text = text.replace(
+    "base: https://example.org/",
+    "base: {{ cookiecutter.site }}"
+)
+
+# 4) base:site -> base:
+text = text.replace(
+    "base:site",
+    "{{ cookiecutter.site }}" 
+)
+
+
+# 5) Public condition: child=0  -> child{{ cookiecutter.publiccond }}
 text = text.replace(
     "where child=0",
     "where child{{ cookiecutter.publiccond }}"

@@ -41,6 +41,7 @@ PREFIX=${PREFIX:-ex}
 echo "Enter URI: URI of site instance including trailing slash or #, e.g. \"https://institute.of.bioimaging.com/\"."
 read -r -p "site_uri [https://example.org/]: " SITE_URI
 SITE_URI=${SITE_URI:-https://example.org/}
+SITE=$(echo $SITE_URI | sed -e 's/[\/,#]$//')
 echo ""
 echo "Setting public data mapping:"
 echo "  - YES  → Only data of the public user is mapped (enter that user's OMERO ID)."
@@ -156,6 +157,7 @@ CC_ARGS=(
   db_host="$DB_HOST"
   prefix="$PREFIX"
   site_uri="$SITE_URI"
+  site="$SITE"
   publiccond="$PUBLICCOND"
 )
 echo ""
