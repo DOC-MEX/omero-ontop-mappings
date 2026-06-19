@@ -19,7 +19,6 @@ dcterms:		http://purl.org/dc/terms/
 geo:            http://www.opengis.net/ont/geosparql#
 geof:           http://www.opengis.net/def/function/geosparql/
 ome_instance: https://example.org/site/
-base: https://example.org/
 
 [MappingDeclaration] @collection [[
 mappingId	image-id
@@ -306,15 +305,15 @@ source		select
 			join annotation on imageannotationlink.child = annotation.id where annotation.textvalue is not NULL
 
 mappingId	MAPID-omero-project
-target		base:site a omekg:OMEROServer ; dcterms:hasPart ome_instance:Project/{id} .
+target		<https://example.org/site> a omekg:OMEROServer ; dcterms:hasPart ome_instance:Project/{id} .
 source		select id from project where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId	MAPID-omero-dataset
-target		base:site a omekg:OMEROServer ; dcterms:hasPart ome_instance:Dataset/{id} .
+target		<https://example.org/site> a omekg:OMEROServer ; dcterms:hasPart ome_instance:Dataset/{id} .
 source		select id from dataset where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId	MAPID-omero-image
-target		base:site a omekg:OMEROServer ; dcterms:hasPart ome_instance:Image/{id} .
+target		<https://example.org/site> a omekg:OMEROServer ; dcterms:hasPart ome_instance:Image/{id} .
 source		select id from image where group_id in (select parent as group_id from groupexperimentermap where child=0)
 
 mappingId       MAPID-image-geosparql-point

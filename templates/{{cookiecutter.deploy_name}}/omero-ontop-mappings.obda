@@ -19,7 +19,6 @@ dcterms:		http://purl.org/dc/terms/
 geo:            http://www.opengis.net/ont/geosparql#
 geof:           http://www.opengis.net/def/function/geosparql/
 {{ cookiecutter.prefix }}: {{ cookiecutter.site_uri }}
-base: {{ cookiecutter.site }}
 
 [MappingDeclaration] @collection [[
 mappingId	image-id
@@ -306,15 +305,15 @@ source		select
 			join annotation on imageannotationlink.child = annotation.id where annotation.textvalue is not NULL
 
 mappingId	MAPID-omero-project
-target		{{ cookiecutter.site }} a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Project/{id} .
+target		<{{ cookiecutter.site }}> a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Project/{id} .
 source		select id from project where group_id in (select parent as group_id from groupexperimentermap where child{{ cookiecutter.publiccond }})
 
 mappingId	MAPID-omero-dataset
-target		{{ cookiecutter.site }} a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Dataset/{id} .
+target		<{{ cookiecutter.site }}> a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Dataset/{id} .
 source		select id from dataset where group_id in (select parent as group_id from groupexperimentermap where child{{ cookiecutter.publiccond }})
 
 mappingId	MAPID-omero-image
-target		{{ cookiecutter.site }} a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Image/{id} .
+target		<{{ cookiecutter.site }}> a omekg:OMEROServer ; dcterms:hasPart {{ cookiecutter.prefix }}:Image/{id} .
 source		select id from image where group_id in (select parent as group_id from groupexperimentermap where child{{ cookiecutter.publiccond }})
 
 mappingId       MAPID-image-geosparql-point

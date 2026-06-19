@@ -21,17 +21,11 @@ text = text.replace(
     "{{ cookiecutter.prefix }}:"
 )
 
-# 3) Prefix line: base: https://example.org/
-#    becomes: base: {{ cookiecutter.site_uri }}
-text = text.replace(
-    "base: https://example.org/",
-    "base: {{ cookiecutter.site }}"
-)
 
 # 4) base:site -> base:
 text = text.replace(
-    "base:site",
-    "{{ cookiecutter.site }}" 
+    "<https://example.org/site>",
+    "<{{ cookiecutter.site }}>" 
 )
 
 

@@ -6,6 +6,6 @@
 
   "prefix": "ome_instance",
   "site_uri": "https://example.org/site/",
-    "site": "https://example.org",
+    "site": "https://example.org/site",
   "publiccond": ">=0"
 }
