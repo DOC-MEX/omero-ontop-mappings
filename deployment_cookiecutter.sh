@@ -4,19 +4,234 @@ set -Eeuo pipefail
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
 # Temporary working directory for Cookiecutter
-OUT="tmp"                     
+OUT="tmp"
 SETTINGS="${SETTINGS:-omero-ontop-config}"
 BASE_DIR="omero-ontop-mappings"
 
 # 1) Ensure tmp exists  and remove any old content
-if [[ -d "$OUT" ]]; then  
+if [[ -d "$OUT" ]]; then
   rm -rf "$OUT"
 fi
 mkdir -p "$OUT"
 
-echo "🔧 Ontop deployment configuration"
+###############################################################################
+# Optional: update OBDA mapping in an existing deployment
+###############################################################################
 
-# --- Ask user for values 
+echo "🔧 Ontop deployment helper"
+
+while true; do
+  read -r -p "Do you want to update the OBDA mapping of an existing deployment? [no]/yes: " UPDATE_OBDA
+  UPDATE_OBDA=${UPDATE_OBDA:-no}
+  UPDATE_OBDA_LC=$(echo "$UPDATE_OBDA" | tr '[:upper:]' '[:lower:]')
+
+  case "$UPDATE_OBDA_LC" in
+    yes|y)
+      read -r -p "Existing deployment prefix/folder name: " DEPLOY_DIR
+      DEPLOY_DIR="${DEPLOY_DIR%/}"
+
+      if [[ -z "$DEPLOY_DIR" ]]; then
+        echo "ERROR: Deployment folder cannot be empty." >&2
+        exit 1
+      fi
+
+      if [[ ! -d "$DEPLOY_DIR" ]]; then
+        echo "ERROR: Deployment folder '$DEPLOY_DIR' does not exist." >&2
+        exit 1
+      fi
+
+      PREFIX="$(basename "$DEPLOY_DIR")"
+      DEST_OBDA="${DEPLOY_DIR}/${PREFIX}.obda"
+
+      if [[ ! -f "$DEST_OBDA" ]]; then
+        echo "ERROR: Cannot find deployed OBDA file: $DEST_OBDA" >&2
+        exit 1
+      fi
+
+      SITE_URI=$(grep -E "^${PREFIX}:[[:space:]]+" "$DEST_OBDA" | head -n 1 | awk '{print $2}')
+      if [[ -z "${SITE_URI:-}" ]]; then
+        echo " ERROR: Could not extract site_uri from $DEST_OBDA" >&2
+        echo "   Expected a prefix line like:" >&2
+        echo "   ${PREFIX}:   https://example.org/site/" >&2
+        exit 1
+      fi
+
+      SITE=$(echo "$SITE_URI" | sed -e 's/[\/,#]$//')
+
+      PUBLICCOND=$(grep -Eo 'where child[[:space:]]*([=<>!]+)[[:space:]]*[0-9]+' "$DEST_OBDA" \
+        | head -n 1 \
+        | sed -E 's/.*child[[:space:]]*//; s/[[:space:]]//g')
+
+      if [[ -z "${PUBLICCOND:-}" ]]; then
+        echo " ERROR: Could not extract publiccond from $DEST_OBDA" >&2
+        echo "   Expected a SQL fragment like:" >&2
+        echo "   where child=2" >&2
+        echo "   or:" >&2
+        echo "   where child>=0" >&2
+        exit 1
+      fi
+
+      echo ""
+      echo "The update will use these detected values:"
+      echo "   deployment : $DEPLOY_DIR"
+      echo "   prefix     : $PREFIX"
+      echo "   site_uri   : $SITE_URI"
+      echo "   publiccond : $PUBLICCOND"
+      echo ""
+
+      while true; do
+        read -r -p "Continue with OBDA update? [yes]/no: " CONFIRM_UPDATE
+        CONFIRM_UPDATE=${CONFIRM_UPDATE:-yes}
+        CONFIRM_UPDATE_LC=$(echo "$CONFIRM_UPDATE" | tr '[:upper:]' '[:lower:]')
+
+        case "$CONFIRM_UPDATE_LC" in
+          yes|y)
+            break
+            ;;
+          no|n)
+            echo "Update cancelled."
+            exit 0
+            ;;
+          *)
+            echo "Please answer 'yes' or 'no' (or press Enter for 'yes')."
+            ;;
+        esac
+      done
+
+      echo ""
+      echo " Preparing OBDA template from latest repository mapping ..."
+
+      if [[ -f "prepare_obda_template.py" ]]; then
+        if command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+          "$PYTHON_BIN" prepare_obda_template.py
+        else
+          echo " ERROR: Python interpreter '$PYTHON_BIN' not found."
+          exit 1
+        fi
+      else
+        echo " ERROR: prepare_obda_template.py not found."
+        exit 1
+      fi
+
+      CC_ARGS=(
+        "templates"
+        -o "$OUT"
+        --no-input
+        deploy_name="$SETTINGS"
+        jdbc_user="dummy"
+        jdbc_password="dummy"
+        db_host="localhost"
+        prefix="$PREFIX"
+        site_uri="$SITE_URI"
+        site="$SITE"
+        publiccond="$PUBLICCOND"
+      )
+
+      echo ""
+      echo "  Regenerating OBDA with Cookiecutter ..."
+      cookiecutter "${CC_ARGS[@]}"
+
+      GEN_DIR=""
+      for d in "$OUT"/*; do
+        if [[ -d "$d" ]]; then
+          GEN_DIR="$d"
+          break
+        fi
+      done
+
+      if [[ -z "$GEN_DIR" ]]; then
+        echo " ERROR: No generated directory found in '$OUT'" >&2
+        exit 1
+      fi
+
+      SRC_OBDA="$GEN_DIR/omero-ontop-mappings.obda"
+
+      if [[ ! -f "$SRC_OBDA" ]]; then
+        echo " ERROR: Generated OBDA file not found at $SRC_OBDA" >&2
+        exit 1
+      fi
+
+      #########################################################################
+      # Update OBDA mapping
+      #########################################################################
+
+      BACKUP_OBDA="${DEST_OBDA}.backup.$(date +%Y%m%d-%H%M%S)"
+      cp -v "$DEST_OBDA" "$BACKUP_OBDA"
+      cp -v "$SRC_OBDA" "$DEST_OBDA"
+
+      echo ""
+      echo " Existing deployment OBDA updated:"
+      echo "   $DEST_OBDA"
+      echo ""
+      echo "Backup created:"
+      echo "   $BACKUP_OBDA"
+
+      #########################################################################
+      # Optionally update ontology (.ttl)
+      #########################################################################
+
+      SRC_TTL="${BASE_DIR}/omero-ontop-mappings.ttl"
+      DEST_TTL="${DEPLOY_DIR}/${PREFIX}.ttl"
+
+      if [[ -f "$SRC_TTL" && -f "$DEST_TTL" ]]; then
+
+        while true; do
+          read -r -p "Also update ontology file (.ttl)? [yes]/no: " UPDATE_TTL
+          UPDATE_TTL=${UPDATE_TTL:-yes}
+          UPDATE_TTL_LC=$(echo "$UPDATE_TTL" | tr '[:upper:]' '[:lower:]')
+
+          case "$UPDATE_TTL_LC" in
+            yes|y)
+              BACKUP_TTL="${DEST_TTL}.backup.$(date +%Y%m%d-%H%M%S)"
+              cp -v "$DEST_TTL" "$BACKUP_TTL"
+              cp -v "$SRC_TTL" "$DEST_TTL"
+
+              echo ""
+              echo " Existing deployment ontology updated:"
+              echo "   $DEST_TTL"
+              echo ""
+              echo "Backup created:"
+              echo "   $BACKUP_TTL"
+              break
+              ;;
+
+            no|n)
+              echo "Skipping ontology update."
+              break
+              ;;
+
+            *)
+              echo "Please answer 'yes' or 'no' (or press Enter for 'yes')."
+              ;;
+          esac
+        done
+
+      else
+        echo ""
+        echo " Ontology update skipped."
+        echo "   Source or destination ontology file not found."
+      fi
+
+      echo ""
+      echo "Next steps:"
+      echo "  cd $DEPLOY_DIR"
+      echo "  ./${PREFIX}-ontop-materialize.sh"
+      echo ""
+      echo "If using QLever, reindex after materializing."
+      exit 0
+      ;;
+    no|n)
+      break
+      ;;
+    *)
+      echo "Please answer 'yes' or 'no' (or press Enter for 'no')."
+      ;;
+  esac
+done
+
+echo " Ontop deployment configuration"
+
+# --- Ask user for values
 echo "Please enter database username (postgres user), password, and its URL, e.g.: localhost or host.example.com"
 read -r -p "Postgres user: " JDBC_USER
 while [[ -z "$JDBC_USER" ]]; do
@@ -41,7 +256,7 @@ PREFIX=${PREFIX:-ex}
 echo "Enter URI: URI of site instance including trailing slash or #, e.g. \"https://institute.of.bioimaging.com/\"."
 read -r -p "site_uri [https://example.org/]: " SITE_URI
 SITE_URI=${SITE_URI:-https://example.org/}
-SITE=$(echo $SITE_URI | sed -e 's/[\/,#]$//')
+SITE=$(echo "$SITE_URI" | sed -e 's/[\/,#]$//')
 echo ""
 echo "Setting public data mapping:"
 echo "  - YES  → Only data of the public user is mapped (enter that user's OMERO ID)."
@@ -146,7 +361,7 @@ else
   echo "⚠️ WARNING: prepare_obda_template.py not found — OBDA template not updated."
 fi
 
-# 2) Build cookiecutter args 
+# 2) Build cookiecutter args
 CC_ARGS=(
   "templates"
   -o "$OUT"
@@ -261,6 +476,9 @@ fi
 # OBDA from Cookiecutter, renamed
 cp -v "$SRC_OBDA" "${PREFIX}/${PREFIX}.obda"
 
+# Deployment values, useful for future update operations
+cp -v "$SRC_ENV" "${PREFIX}/deploy.env"
+
 # Ontop launch script
 if [[ -f "$BASE_DIR/omero-ontop.sh" ]]; then
   sed "s/omero-ontop-mappings/${PREFIX}/g" "$BASE_DIR/omero-ontop.sh" > "${PREFIX}/${PREFIX}-ontop-endpoint.sh"
@@ -276,7 +494,7 @@ db_host_final=$(echo "$jdbc_url" | sed 's#^jdbc:postgresql://##; s/:5432.*$//')
 
 
 echo ""
-echo "✅ Deployment folder created: $PREFIX/"
+echo " Deployment folder created: $PREFIX/"
 
 echo ""
 echo "   Postgres user : $jdbc_user_final"
@@ -341,7 +559,7 @@ EOF
 chmod +x "$MAT_SCRIPT"
 
 echo ""
-echo "🧪 Materialization script created:"
+echo " Materialization script created:"
 echo "   $MAT_SCRIPT"
 echo ""
 ###############################################################################
@@ -357,12 +575,12 @@ if [[ "$CREATE_QLEVER_ENDPOINT" == "yes" ]]; then
   else
     echo "📁 Copying QLever scripts..."
     mkdir -p "$QLEVER_DST"
-    cp -a "$QLEVER_SRC"/. "$QLEVER_DST"/ #portable for Mac and linux. Avoids extra unnecessary subdirectory on ubuntu 
+    cp -a "$QLEVER_SRC"/. "$QLEVER_DST"/ #portable for Mac and linux. Avoids extra unnecessary subdirectory on ubuntu
     chmod +x "$QLEVER_DST/"*.sh 2>/dev/null || true
   fi
 
   echo ""
-  echo "🚀 QLever setup information"
+  echo " QLever setup information"
   echo ""
   echo "To use the QLever SPARQL endpoint, follow these steps:"
   echo ""
