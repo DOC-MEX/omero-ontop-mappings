@@ -18,7 +18,21 @@ CONTAINER_PORT="9090"
 #
 PETRIMAPS_MODE="${PETRIMAPS_MODE:-linux}"
 
+# Optional Linux helper:
+# If Petrimaps must reach a backend hostname that is resolvable on the host
+# but not inside Docker, set:
+#
+#   PETRIMAPS_HOST_ALIAS=micropop-server-name ./petrimaps.sh restart
+#
+PETRIMAPS_HOST_ALIAS="${PETRIMAPS_HOST_ALIAS:-}"
+
 ACTION="${1:-start}"
+
+docker_host_alias_arg() {
+    if [[ -n "$PETRIMAPS_HOST_ALIAS" ]]; then
+        echo "--add-host=${PETRIMAPS_HOST_ALIAS}:host-gateway"
+    fi
+}
 
 start_container() {
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
@@ -29,16 +43,28 @@ start_container() {
 
             docker run -d \
                 --name "$CONTAINER_NAME" \
+                $(docker_host_alias_arg) \
                 -p "${HOST_PORT}:${CONTAINER_PORT}" \
                 --restart unless-stopped \
                 "$IMAGE"
 
-            echo " Petrimaps started"            
+            echo " Petrimaps started"
+            echo "   Mode : linux"
             echo "   URL  : http://localhost:${HOST_PORT}"
+
+            if [[ -n "$PETRIMAPS_HOST_ALIAS" ]]; then
+                echo "   Host alias: ${PETRIMAPS_HOST_ALIAS} -> host-gateway"
+            fi
+
             echo
-            echo "QLever UI configuration:"
-            echo "   baseUrl:        http://localhost:8888"
-            echo "   mapViewBaseURL: http://localhost:${HOST_PORT}"
+            echo "QLever UI YAML configuration:"
+            echo "   Local backend:"
+            echo "     baseUrl:        http://localhost:8888"
+            echo "     mapViewBaseURL: http://localhost:${HOST_PORT}"
+            echo
+            echo "   Proxied backend:"
+            echo "     baseUrl:        http://${PETRIMAPS_HOST_ALIAS:-YOUR_HOSTNAME}/sparql/"
+            echo "     mapViewBaseURL: http://${PETRIMAPS_HOST_ALIAS:-YOUR_HOSTNAME}/petrimaps"
             ;;
 
         mac)
@@ -109,6 +135,7 @@ case "$ACTION" in
         echo "  ./petrimaps.sh"
         echo "  ./petrimaps.sh restart"
         echo "  PETRIMAPS_MODE=mac ./petrimaps.sh"
+        echo "  PETRIMAPS_HOST_ALIAS=micropop-virtuoso ./petrimaps.sh restart"
         exit 1
         ;;
 
