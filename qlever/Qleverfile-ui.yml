@@ -241,5 +241,5 @@ config:
       } GROUP BY ?qleverui_entity ORDER BY DESC(?qleverui_count)
 
       # ENDIF #
-    mapViewBaseURL: ''
+    mapViewBaseURL: 'http://localhost:9100'
   examples: []
