@@ -7,25 +7,56 @@ IMAGE="adfreiburg/qlever-petrimaps:latest"
 HOST_PORT="${HOST_PORT:-9100}"
 CONTAINER_PORT="9090"
 
-# Deployment mode:
+###############################################################################
+# Petrimaps deployment
 #
-#   linux (default)
-#       Standard deployment for Linux servers.
+# Default QLever UI deployments normally use, when running locally:
 #
-#   mac
-#       Docker Desktop on macOS. Adds the qlever-host alias so
-#       Petrimaps can reach the QLever backend running on the host.
+#   baseUrl: http://localhost:8888
 #
-PETRIMAPS_MODE="${PETRIMAPS_MODE:-linux}"
+# This is fine for qlever-ui itself. However, Petrimaps runs in Docker.
+# If Petrimaps receives:
+#
+#   backend=http://localhost:8888
+#
+# then "localhost" means the Petrimaps container, not the host machine.
+#
+# Therefore, for local Petrimaps testing  (macOS or Linux) use a host alias
+# such as `qlever-host`.
+#
+# Local Petrimaps setup:
+#
+#   1. Add on the host:
+#        127.0.0.1 qlever-host
+#         (echo "127.0.0.1 qlever-host" | sudo tee -a /etc/hosts)
+#
+#   2. Start Petrimaps with:
+#        PETRIMAPS_HOST_ALIAS=qlever-host ./petrimaps.sh restart
+#
+#   3. Change Qleverfile-ui.yml from:
+#        baseUrl: http://localhost:8888
+#
+#      to:
+#        baseUrl: http://qlever-host:8888
+#
+#      The map URL can stay:
+#        mapViewBaseURL: http://localhost:9100
+#
+# Live server setup:
+#
+#   Use the public/proxied backend URL in Qleverfile-ui.yml, for example:
+#
+#        baseUrl:        https://YOUR_SERVER/qlever
+#        mapViewBaseURL: https://YOUR_SERVER/petrimaps
+#
+#   Then proxy /petrimaps/ to localhost:9100.
+#
+#   If the backend hostname is not reachable from inside Docker, start with:
+#
+#        PETRIMAPS_HOST_ALIAS=YOUR_HOSTNAME ./petrimaps.sh restart
+###############################################################################
 
-# Optional Linux helper:
-# If Petrimaps must reach a backend hostname that is resolvable on the host
-# but not inside Docker, set:
-#
-#   PETRIMAPS_HOST_ALIAS=micropop-server-name ./petrimaps.sh restart
-#
 PETRIMAPS_HOST_ALIAS="${PETRIMAPS_HOST_ALIAS:-}"
-
 ACTION="${1:-start}"
 
 docker_host_alias_arg() {
@@ -37,106 +68,71 @@ docker_host_alias_arg() {
 start_container() {
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-    case "$PETRIMAPS_MODE" in
+    docker run -d \
+        --name "$CONTAINER_NAME" \
+        $(docker_host_alias_arg) \
+        -p "${HOST_PORT}:${CONTAINER_PORT}" \
+        --restart unless-stopped \
+        "$IMAGE"
 
-        linux)
+    echo " Petrimaps started"
+    echo "   URL: http://localhost:${HOST_PORT}"
 
-            docker run -d \
-                --name "$CONTAINER_NAME" \
-                $(docker_host_alias_arg) \
-                -p "${HOST_PORT}:${CONTAINER_PORT}" \
-                --restart unless-stopped \
-                "$IMAGE"
+    if [[ -n "$PETRIMAPS_HOST_ALIAS" ]]; then
+        echo "   Host alias: ${PETRIMAPS_HOST_ALIAS} -> host-gateway"
+    fi
 
-            echo " Petrimaps started"
-            echo "   Mode : linux"
-            echo "   URL  : http://localhost:${HOST_PORT}"
-
-            if [[ -n "$PETRIMAPS_HOST_ALIAS" ]]; then
-                echo "   Host alias: ${PETRIMAPS_HOST_ALIAS} -> host-gateway"
-            fi
-
-            echo
-            echo "QLever UI YAML configuration:"
-            echo "   Local backend:"
-            echo "     baseUrl:        http://localhost:8888"
-            echo "     mapViewBaseURL: http://localhost:${HOST_PORT}"
-            echo
-            echo "   Proxied backend:"
-            echo "     baseUrl:        http://${PETRIMAPS_HOST_ALIAS:-YOUR_HOSTNAME}/sparql/"
-            echo "     mapViewBaseURL: http://${PETRIMAPS_HOST_ALIAS:-YOUR_HOSTNAME}/petrimaps"
-            ;;
-
-        mac)
-
-            docker run -d \
-                --name "$CONTAINER_NAME" \
-                --add-host=qlever-host:host-gateway \
-                -p "${HOST_PORT}:${CONTAINER_PORT}" \
-                --restart unless-stopped \
-                "$IMAGE"
-
-            echo " Petrimaps started"
-            echo "   Mode : macOS"
-            echo "   URL  : http://localhost:${HOST_PORT}"
-            echo
-            echo "Reminder:"
-            echo "   /etc/hosts should contain:"
-            echo "      127.0.0.1 qlever-host"
-            echo
-            echo "QLever UI configuration:"
-            echo "   baseUrl:        http://qlever-host:8888"
-            echo "   mapViewBaseURL: http://localhost:${HOST_PORT}"
-            ;;
-
-        *)
-
-            echo "Unknown PETRIMAPS_MODE: $PETRIMAPS_MODE"
-            echo "Supported modes: linux, mac"
-            exit 1
-
-            ;;
-
-    esac
+    echo
+    echo "Note:"
+    echo "   If Qleverfile-ui.yml uses baseUrl: http://localhost:8888,"
+    echo "   qlever-ui will work, but Petrimaps may fail because localhost"
+    echo "   inside the Petrimaps container is not the host machine."
+    echo
+    echo " Qleverfile-ui.yml configuration examples:"
+    echo
+    echo "   Default qlever-ui only, no Petrimaps:"
+    echo "     baseUrl:        http://localhost:8888"
+    echo
+    echo "   Local development with Petrimaps:"
+    echo "     baseUrl:        http://qlever-host:8888"
+    echo "     mapViewBaseURL: http://localhost:${HOST_PORT}"
+    echo
+    echo "   Live server with public/proxied backend:"
+    echo "     baseUrl:        http(s)://YOUR_SERVER/YOUR_BACKEND_ENDPOINT"
+    echo "     mapViewBaseURL: http(s)://YOUR_SERVER/petrimaps"
+    echo
 }
 
 case "$ACTION" in
-
     start)
-
         echo " Starting Petrimaps..."
         start_container
         ;;
 
     stop)
-
         echo " Stopping Petrimaps..."
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         echo " Petrimaps stopped."
         ;;
 
     restart)
-
         echo " Restarting Petrimaps..."
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         start_container
         ;;
 
     status)
-
         docker ps --filter "name=$CONTAINER_NAME"
         ;;
 
     *)
-
         echo "Usage: $0 {start|stop|restart|status}"
         echo
         echo "Examples:"
         echo "  ./petrimaps.sh"
         echo "  ./petrimaps.sh restart"
-        echo "  PETRIMAPS_MODE=mac ./petrimaps.sh"
+        echo "  PETRIMAPS_HOST_ALIAS=qlever-host ./petrimaps.sh restart"
         echo "  PETRIMAPS_HOST_ALIAS=micropop-virtuoso ./petrimaps.sh restart"
         exit 1
         ;;
-
 esac
