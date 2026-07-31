@@ -214,6 +214,7 @@ docker run --rm \
       -f '${DATA_FILE_IN_C}' \
       -g '${GRAPH_URI}' \
       -F ttl -p false \
+      --parser-buffer-size 500M \
       --stxxl-memory ${STXXL_MEMORY}
   " | tee "$LOG_FILE"
 
